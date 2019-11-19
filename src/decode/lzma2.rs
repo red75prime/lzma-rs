@@ -160,7 +160,7 @@ where
 
     decoder.set_unpacked_size(Some(unpacked_size));
 
-    let taken = crate::counting_reader::CountingReader::from(input.take(packed_size));
+    let taken = input.take(packed_size);
     let mut rangecoder = rangecoder::RangeDecoder::new(taken).or_else(|e| {
         Err(error::Error::lzma_other(format!(
             "LZMA input too short: {}",

@@ -5,9 +5,11 @@ extern crate crc;
 
 mod decode;
 mod encode;
+#[cfg(feature = "counting_reader")]
 mod counting_reader;
 pub mod error;
 
+#[cfg(feature = "counting_reader")]
 pub use counting_reader::CountingReader;
 use crate::decode::lzbuffer::LZBuffer;
 use std::io;
