@@ -5,19 +5,21 @@ extern crate crc;
 
 mod decode;
 mod encode;
+mod counting_reader;
 pub mod error;
 
+pub use counting_reader::CountingReader;
 use crate::decode::lzbuffer::LZBuffer;
 use std::io;
 
 pub fn lzma_decompress<R: io::BufRead, W: io::Write>(
-    input: &mut R,
-    output: &mut W,
+    mut input: R,
+    mut output: W,
 ) -> error::Result<()> {
-    let params = decode::lzma::LZMAParams::read_header(input)?;
-    let mut decoder = decode::lzma::new_circular(output, params)?;
+    let params = decode::lzma::LZMAParams::read_header(&mut input)?;
+    let mut decoder = decode::lzma::new_circular(&mut output, params)?;
     let mut rangecoder = decode::rangecoder::RangeDecoder::new(input).or_else(|e| {
-        Err(error::Error::LZMAError(format!(
+        Err(error::Error::lzma_other(format!(
             "LZMA stream too short: {}",
             e
         )))

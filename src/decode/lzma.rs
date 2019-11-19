@@ -21,7 +21,7 @@ impl LZMAParams {
     {
         // Properties
         let props = input.read_u8().or_else(|e| {
-            Err(error::Error::LZMAError(format!(
+            Err(error::Error::lzma_other(format!(
                 "LZMA header too short: {}",
                 e
             )))
@@ -29,7 +29,7 @@ impl LZMAParams {
 
         let mut pb = props as u32;
         if pb >= 225 {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "LZMA header invalid properties: {} must be < 225",
                 pb
             )));
@@ -44,7 +44,7 @@ impl LZMAParams {
 
         // Dictionary
         let dict_size_provided = input.read_u32::<LittleEndian>().or_else(|e| {
-            Err(error::Error::LZMAError(format!(
+            Err(error::Error::lzma_other(format!(
                 "LZMA header too short: {}",
                 e
             )))
@@ -59,7 +59,7 @@ impl LZMAParams {
 
         // Unpacked size
         let unpacked_size_provided = input.read_u64::<LittleEndian>().or_else(|e| {
-            Err(error::Error::LZMAError(format!(
+            Err(error::Error::lzma_other(format!(
                 "LZMA header too short: {}",
                 e
             )))
@@ -147,10 +147,10 @@ where
 }
 
 // Initialize decoder with circular buffer
-pub fn new_circular<'a, W>(
-    output: &'a mut W,
+pub fn new_circular<W>(
+    output: W,
     params: LZMAParams,
-) -> error::Result<DecoderState<lzbuffer::LZCircularBuffer<'a, W>>>
+) -> error::Result<DecoderState<lzbuffer::LZCircularBuffer<W>>>
 where
     W: io::Write,
 {
@@ -210,7 +210,7 @@ where
 
     pub fn process<'a, R: io::BufRead>(
         &mut self,
-        rangecoder: &mut rangecoder::RangeDecoder<'a, R>,
+        rangecoder: &mut rangecoder::RangeDecoder<R>,
     ) -> error::Result<()> {
         loop {
             if let Some(_) = self.unpacked_size {
@@ -297,9 +297,7 @@ where
                     if rangecoder.is_finished_ok()? {
                         break;
                     }
-                    return Err(error::Error::LZMAError(String::from(
-                        "Found end-of-stream marker but more bytes are available",
-                    )));
+                    return Err(error::Error::LZMAError(error::LZMAError::ExtraBytes));
                 }
             }
 
@@ -307,11 +305,11 @@ where
 
             let dist = self.rep[0] + 1;
             self.output.append_lz(len, dist)?;
-        }
+        } // end loop
 
         if let Some(len) = self.unpacked_size {
             if self.output.len() as u64 != len {
-                return Err(error::Error::LZMAError(format!(
+                return Err(error::Error::lzma_other(format!(
                     "Expected unpacked size of {} but decompressed to {}",
                     len,
                     self.output.len()
@@ -324,7 +322,7 @@ where
 
     fn decode_literal<'a, R: io::BufRead>(
         &mut self,
-        rangecoder: &mut rangecoder::RangeDecoder<'a, R>,
+        rangecoder: &mut rangecoder::RangeDecoder<R>,
     ) -> error::Result<u8> {
         let def_prev_byte = 0u8;
         let prev_byte = self.output.last_or(def_prev_byte) as usize;
@@ -358,7 +356,7 @@ where
 
     fn decode_distance<'a, R: io::BufRead>(
         &mut self,
-        rangecoder: &mut rangecoder::RangeDecoder<'a, R>,
+        rangecoder: &mut rangecoder::RangeDecoder<R>,
         length: usize,
     ) -> error::Result<usize> {
         let len_state = if length > 3 { 3 } else { length };

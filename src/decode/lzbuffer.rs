@@ -74,7 +74,7 @@ where
     fn last_n(&self, dist: usize) -> error::Result<u8> {
         let buf_len = self.buf.len();
         if dist > buf_len {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "Match distance {} is beyond output size {}",
                 dist, buf_len
             )));
@@ -95,7 +95,7 @@ where
         debug!("LZ {{ len: {}, dist: {} }}", len, dist);
         let buf_len = self.buf.len();
         if dist > buf_len {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "LZ distance {} is beyond output size {}",
                 dist, buf_len
             )));
@@ -120,22 +120,22 @@ where
 }
 
 // A circular buffer for LZ sequences
-pub struct LZCircularBuffer<'a, W>
+pub struct LZCircularBuffer<W>
 where
-    W: 'a + io::Write,
+    W: io::Write,
 {
-    stream: &'a mut W, // Output sink
+    stream: W, // Output sink
     buf: Vec<u8>,      // Circular buffer
     dict_size: usize,  // Length of the buffer
     cursor: usize,     // Current position
     len: usize,        // Total number of bytes sent through the buffer
 }
 
-impl<'a, W> LZCircularBuffer<'a, W>
+impl<W> LZCircularBuffer<W>
 where
     W: io::Write,
 {
-    pub fn from_stream(stream: &'a mut W, dict_size: usize) -> Self {
+    pub fn from_stream(stream: W, dict_size: usize) -> Self {
         info!("Dict size in LZ buffer: {}", dict_size);
         Self {
             stream,
@@ -147,7 +147,7 @@ where
     }
 }
 
-impl<'a, W> LZBuffer for LZCircularBuffer<'a, W>
+impl<W> LZBuffer for LZCircularBuffer<W>
 where
     W: io::Write,
 {
@@ -167,13 +167,13 @@ where
     // Retrieve the n-th last byte
     fn last_n(&self, dist: usize) -> error::Result<u8> {
         if dist > self.dict_size {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "Match distance {} is beyond dictionary size {}",
                 dist, self.dict_size
             )));
         }
         if dist > self.len {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "Match distance {} is beyond output size {}",
                 dist, self.len
             )));
@@ -202,13 +202,13 @@ where
     fn append_lz(&mut self, len: usize, dist: usize) -> error::Result<()> {
         debug!("LZ {{ len: {}, dist: {} }}", len, dist);
         if dist > self.dict_size {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "LZ distance {} is beyond dictionary size {}",
                 dist, self.dict_size
             )));
         }
         if dist > self.len {
-            return Err(error::Error::LZMAError(format!(
+            return Err(error::Error::lzma_other(format!(
                 "LZ distance {} is beyond output size {}",
                 dist, self.len
             )));
@@ -227,7 +227,7 @@ where
     }
 
     // Flush the buffer to the output
-    fn finish(self) -> io::Result<()> {
+    fn finish(mut self) -> io::Result<()> {
         if self.cursor > 0 {
             self.stream.write_all(&self.buf[0..self.cursor])?;
             self.stream.flush()?;

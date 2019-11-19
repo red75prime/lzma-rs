@@ -3,20 +3,18 @@ use crate::decode::util;
 use crate::error;
 use std::io;
 
-pub struct RangeDecoder<'a, R>
-where
-    R: 'a + io::BufRead,
+pub struct RangeDecoder<R>
 {
-    stream: &'a mut R,
+    stream: R,
     range: u32,
     code: u32,
 }
 
-impl<'a, R> RangeDecoder<'a, R>
+impl<R> RangeDecoder<R>
 where
     R: io::BufRead,
 {
-    pub fn new(stream: &'a mut R) -> io::Result<Self> {
+    pub fn new(stream: R) -> io::Result<Self> {
         let mut dec = Self {
             stream,
             range: 0xFFFF_FFFF,
@@ -30,7 +28,7 @@ where
 
     #[inline]
     pub fn is_finished_ok(&mut self) -> io::Result<bool> {
-        Ok(self.code == 0 && util::is_eof(self.stream)?)
+        Ok(self.code == 0 && util::is_eof(&mut self.stream)?)
     }
 
     #[inline]
@@ -57,9 +55,9 @@ where
         self.range >>= 1;
 
         if self.code == self.range {
-            return Err(error::Error::LZMAError(String::from(
+            return Err(error::Error::lzma_other(
                 "Corrupted range coding",
-            )));
+            ));
         }
 
         let bit = self.code > self.range;
